@@ -2,16 +2,33 @@
 #include "Misc/Paths.h"
 #include "HAL/FileManager.h"
 
-TArray<FString> UModelLoader::GetFBXFilesInDirectory(const FString& Directory)
+TArray<FFBXFileInfo> UModelLoader::GetFBXFilesInDirectory(const FString& Directory)
 {
-  TArray<FString> FoundFiles;
+  TArray<FFBXFileInfo> FoundFiles;
 
-  // Forma correcta de especificar el path
   FString SearchPath = Directory + TEXT("/*.fbx");
+  TArray<FString> FileNames;
 
-  // Obtener los archivos FBX en la carpeta
+  // Obtener los nombres de los archivos
   IFileManager& FileManager = IFileManager::Get();
-  FileManager.FindFiles(FoundFiles, *SearchPath, true, false);
+  FileManager.FindFiles(FileNames, *SearchPath, true, false);
+
+  for (const FString& FileName : FileNames)
+  {
+    FFBXFileInfo FileInfo;
+    FileInfo.FileName = FileName;
+
+    FString FullPath = FPaths::Combine(Directory, FileName);
+    FFileStatData StatData = FileManager.GetStatData(*FullPath);
+
+    if (StatData.bIsValid)
+    {
+      FileInfo.FileSize = StatData.FileSize; // Tamaño en bytes
+      FileInfo.LastModified = StatData.ModificationTime;
+    }
+
+    FoundFiles.Add(FileInfo);
+  }
 
   return FoundFiles;
 }
