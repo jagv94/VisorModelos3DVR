@@ -39,10 +39,6 @@
 				"Android",
 				"VisionOS"
 			]
-		},
-		{
-			"Name": "RuntimeMeshLoader",
-			"Enabled": true
 		}
 	],
 	"TargetPlatforms": [
