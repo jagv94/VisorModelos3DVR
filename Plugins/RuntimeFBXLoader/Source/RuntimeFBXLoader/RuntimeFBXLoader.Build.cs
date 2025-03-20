@@ -18,7 +18,8 @@ public class RuntimeFBXLoader : ModuleRules
                 "CoreUObject",
                 "Engine",
                 "RenderCore",
-                "RHI" // Para renderizado de mallas
+                "RHI", // Para renderizado de mallas
+                "MeshUtilitiesCommon" // Para trabajar con UStaticMesh
             }
         );
 
@@ -46,18 +47,13 @@ public class RuntimeFBXLoader : ModuleRules
         {
             // Cargar las bibliotecas .lib en Windows
             PublicAdditionalLibraries.Add(Path.Combine(LibraryPath, "assimp-vc143-mt.lib"));
-            PublicAdditionalLibraries.Add(Path.Combine(LibraryPath, "IrrXML.lib"));
-            PublicAdditionalLibraries.Add(Path.Combine(LibraryPath, "zlibstatic.lib"));
 
             // Incluir las DLLs en el paquete del juego
-            string BinaryPath = Path.Combine(AssimpPath, "bin", "Win64");
-            RuntimeDependencies.Add(Path.Combine(BinaryPath, "assimp-vc143-mt.dll"));
-            RuntimeDependencies.Add(Path.Combine(BinaryPath, "zlib.dll"));
+            string BinaryPath = Path.Combine(AssimpPath, "bin", "x64");
 
             // Copiar las DLLs al directorio del juego
             string Destination = Path.Combine("$(ProjectDir)/Binaries/Win64/");
             CopyFile(Path.Combine(BinaryPath, "assimp-vc143-mt.dll"), Destination);
-            CopyFile(Path.Combine(BinaryPath, "zlib.dll"), Destination);
         }
     }
 
