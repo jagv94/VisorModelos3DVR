@@ -5,14 +5,12 @@
 
 UStaticMesh* UFBXLoader::LoadFBX(const FString& FilePath)
 {
-    // Usar FBXLoader para obtener la escena Assimp
     const aiScene* Scene = FBXLoader::LoadFBX(FilePath);
     if (!Scene || !Scene->HasMeshes())
     {
         return nullptr;
     }
 
-    // Convertir la primera malla de Assimp en un UStaticMesh
     return CreateStaticMeshFromAssimp(Scene->mMeshes[0]);
 }
 
@@ -24,7 +22,6 @@ UStaticMesh* UFBXLoader::CreateStaticMeshFromAssimp(aiMesh* Mesh)
         return nullptr;
     }
 
-    // Crear un nuevo Static Mesh en memoria
     UStaticMesh* NewMesh = NewObject<UStaticMesh>();
     if (!NewMesh)
     {
@@ -32,38 +29,49 @@ UStaticMesh* UFBXLoader::CreateStaticMeshFromAssimp(aiMesh* Mesh)
         return nullptr;
     }
 
-    FStaticMeshRenderData* RenderData = new FStaticMeshRenderData();
-    FStaticMeshLODResources& LOD = RenderData->LODResources[0];
+    // Crear RenderData usando MakeUnique para usar TUniquePtr
+    NewMesh->SetRenderData(MakeUnique<FStaticMeshRenderData>());
+    FStaticMeshRenderData* RenderData = NewMesh->GetRenderData();
 
-    // Reservar memoria para vértices e índices
-    LOD.VertexBuffers.PositionVertexBuffer.Init(Mesh->mNumVertices);
-    LOD.IndexBuffer.Reserve(Mesh->mNumFaces * 3);
+    // Crear nuevo recurso LOD
+    FStaticMeshLODResources* LOD = new FStaticMeshLODResources();
+    RenderData->LODResources.Add(LOD);
 
-    // Copiar vértices
-    for (unsigned int i = 0; i < Mesh->mNumVertices; i++)
+    // Inicializar el buffer de posición de vértices
+    LOD->VertexBuffers.PositionVertexBuffer.Init(Mesh->mNumVertices, false);
+    FVector3f* VertexData = reinterpret_cast<FVector3f*>(LOD->VertexBuffers.PositionVertexBuffer.GetVertexData());
+
+    for (uint32 i = 0; i < Mesh->mNumVertices; i++)
     {
-        FVector Position = FVector(Mesh->mVertices[i].x, Mesh->mVertices[i].y, Mesh->mVertices[i].z);
-        LOD.VertexBuffers.PositionVertexBuffer.VertexPosition(i) = Position;
+        VertexData[i] = FVector3f(Mesh->mVertices[i].x, Mesh->mVertices[i].y, Mesh->mVertices[i].z);
     }
 
-    // Copiar índices
+    // Inicializar el buffer de índices
+    TArray<uint32> Indices;
     for (unsigned int i = 0; i < Mesh->mNumFaces; i++)
     {
         aiFace& Face = Mesh->mFaces[i];
-        if (Face.mNumIndices != 3) continue; // Solo triángulos
-
-        for (unsigned int j = 0; j < 3; j++)
+        if (Face.mNumIndices == 3) // Solo triángulos
         {
-            LOD.IndexBuffer.Add(Face.mIndices[j]);
+            Indices.Add(Face.mIndices[0]);
+            Indices.Add(Face.mIndices[1]);
+            Indices.Add(Face.mIndices[2]);
         }
     }
 
-    // Habilitar Nanite
-    NewMesh->NaniteSettings.bEnabled = true;
-    NewMesh->NaniteSettings.Threshold = 1;
+    LOD->IndexBuffer.SetIndices(Indices, EIndexBufferStride::AutoDetect);
 
-    // Asignar el RenderData
-    NewMesh->SetRenderData(RenderData);
+    // Activar Nanite (si es necesario)
+    NewMesh->NaniteSettings.bEnabled = true;
+
+    // Inicializar los recursos
+    LOD->VertexBuffers.PositionVertexBuffer.InitResource();
+    LOD->IndexBuffer.InitResource();
+
+    // Crear el body setup y marcar como modificado
+    NewMesh->CreateBodySetup();
+    NewMesh->MarkPackageDirty();
+
     return NewMesh;
 }
 
@@ -80,7 +88,6 @@ UMaterialInstanceDynamic* UFBXLoader::CreateMaterial(UTexture2D* Texture)
         return nullptr;
     }
 
-    // Crear un material dinámico a partir de un material base en Unreal
     UMaterialInterface* BaseMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Materials/BaseMaterial"));
     if (!BaseMaterial)
     {
