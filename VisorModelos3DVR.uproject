@@ -39,6 +39,10 @@
 				"Android",
 				"VisionOS"
 			]
+		},
+		{
+			"Name": "RuntimeFBXLoader",
+			"Enabled": true
 		}
 	],
 	"TargetPlatforms": [

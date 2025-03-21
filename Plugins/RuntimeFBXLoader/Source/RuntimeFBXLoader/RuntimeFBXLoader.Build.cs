@@ -7,9 +7,6 @@ public class RuntimeFBXLoader : ModuleRules
   {
     PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 
-    // Definir la macro para exportar la API
-    PublicDefinitions.Add("RUNTIMEFBXLOADER_API");
-
     // Añadir dependencias públicas y privadas necesarias para este módulo
     PublicDependencyModuleNames.AddRange(
       new string[]
@@ -48,27 +45,12 @@ public class RuntimeFBXLoader : ModuleRules
       // Cargar las bibliotecas .lib en Windows
       PublicAdditionalLibraries.Add(Path.Combine(LibraryPath, "assimp-vc143-mt.lib"));
       PublicAdditionalLibraries.Add(Path.Combine(LibraryPath, "zlibstatic.lib"));
-      PublicAdditionalLibraries.Add(Path.Combine(LibraryPath, "zlib.lib"));
 
       // Incluir las DLLs en el paquete del juego
       string BinaryPath = Path.Combine(AssimpPath, "bin", "x64");
 
-      RuntimeDependencies.Add(Path.Combine(BinaryPath, "assimp-vc143-mt.dll"));
-      RuntimeDependencies.Add(Path.Combine(BinaryPath, "zlib.dll"));
-
-      // Copiar las DLLs al directorio del juego
-      string Destination = Path.Combine("$(ProjectDir)/Binaries/Win64/");
-      CopyFile(Path.Combine(BinaryPath, "assimp-vc143-mt.dll"), Destination);
-      CopyFile(Path.Combine(BinaryPath, "zlib.dll"), Destination);
+      RuntimeDependencies.Add("$(BinaryOutputDir)/assimp-vc143-mt.dll", Path.Combine(BinaryPath, "assimp-vc143-mt.dll"));
+      RuntimeDependencies.Add("$(BinaryOutputDir)/zlib.dll", Path.Combine(BinaryPath, "zlib.dll"));
     }
-  }
-
-  private void CopyFile(string Source, string Destination)
-  {
-    if (!Directory.Exists(Destination))
-    {
-      Directory.CreateDirectory(Destination);
-    }
-    File.Copy(Source, Path.Combine(Destination, Path.GetFileName(Source)), true);
   }
 }

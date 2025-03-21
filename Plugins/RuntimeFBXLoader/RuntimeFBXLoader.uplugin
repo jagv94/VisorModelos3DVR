@@ -15,10 +15,10 @@
 	"IsExperimentalVersion": false,
 	"Installed": true,
 	"Modules": [
-		{
-			"Name": "RuntimeFBXLoader",
-			"Type": "Runtime",
-			"LoadingPhase": "Default"
-		}
+    {
+      "Name": "RuntimeFBXLoader",
+      "Type": "Runtime",
+      "LoadingPhase": "PostEngineInit"
+    }
 	]
 }
