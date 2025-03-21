@@ -3,15 +3,25 @@
 #include "Engine/StaticMesh.h"
 #include "Rendering/NaniteResources.h"
 #include "Modules/ModuleManager.h"
+#include "Engine/Texture.h"
+#include "Engine/Texture2D.h"
+#include "TextureCompiler.h"
+#include "TextureResource.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "UObject/ConstructorHelpers.h"
 
-DEFINE_LOG_CATEGORY_STATIC(RuntimeFBXLoaderLog, Log, All);
+DEFINE_LOG_CATEGORY(RuntimeFBXLoaderLog);
 
 void FRuntimeFBXLoaderModule::StartupModule()
 {
   UE_LOG(RuntimeFBXLoaderLog, Warning, TEXT("RuntimeFBXLoader module starting..."));
 
-  // Verificar si la DLL de Assimp se carga correctamente
-  FString AssimpDLLPath = FPaths::ProjectDir() / TEXT("Binaries/Win64/assimp-vc143-mt.dll");
+  // Ruta al directorio del plugin
+  FString AssimpDLLPath = FPaths::Combine(
+    FPaths::ProjectPluginsDir(),
+    TEXT("RuntimeFBXLoader/ThirdParty/assimp/bin/x64/assimp-vc143-mt.dll")
+  );
+
   if (!FPaths::FileExists(AssimpDLLPath))
   {
     UE_LOG(RuntimeFBXLoaderLog, Error, TEXT("Assimp DLL not found at %s"), *AssimpDLLPath);
@@ -62,6 +72,8 @@ UStaticMesh* UFBXLoader::CreateStaticMeshFromAssimp(aiMesh* Mesh)
     UE_LOG(RuntimeFBXLoaderLog, Warning, TEXT("Mesh inválida."));
     return nullptr;
   }
+
+  UE_LOG(RuntimeFBXLoaderLog, Warning, TEXT("Vertices: %d, Faces: %d"), Mesh->mNumVertices, Mesh->mNumFaces);
 
   UStaticMesh* NewMesh = NewObject<UStaticMesh>();
   if (!NewMesh)
@@ -118,25 +130,39 @@ UStaticMesh* UFBXLoader::CreateStaticMeshFromAssimp(aiMesh* Mesh)
 
 UTexture2D* UFBXLoader::LoadTextureFromPath(const FString& Path)
 {
-  return Cast<UTexture2D>(StaticLoadObject(UTexture2D::StaticClass(), nullptr, *Path));
+  if (Path.IsEmpty())
+  {
+    UE_LOG(RuntimeFBXLoaderLog, Warning, TEXT("LoadTextureFromPath: Path is empty"));
+    return nullptr;
+  }
+
+  UTexture2D* Texture = Cast<UTexture2D>(StaticLoadObject(UTexture2D::StaticClass(), nullptr, *Path));
+  if (!Texture)
+  {
+    UE_LOG(RuntimeFBXLoaderLog, Warning, TEXT("Failed to load texture from path: %s"), *Path);
+    return nullptr;
+  }
+
+  return Texture;
 }
 
 UMaterialInstanceDynamic* UFBXLoader::CreateMaterial(UTexture2D* Texture)
 {
   if (!Texture)
   {
-    UE_LOG(RuntimeFBXLoaderLog, Warning, TEXT("No se encontró la textura."));
+    UE_LOG(RuntimeFBXLoaderLog, Warning, TEXT("CreateMaterial: Texture is null"));
     return nullptr;
   }
 
   UMaterialInterface* BaseMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Materials/BaseMaterial"));
   if (!BaseMaterial)
   {
-    UE_LOG(RuntimeFBXLoaderLog, Error, TEXT("No se encontró el material base."));
+    UE_LOG(RuntimeFBXLoaderLog, Error, TEXT("CreateMaterial: BaseMaterial not found"));
     return nullptr;
   }
 
   UMaterialInstanceDynamic* MatInstance = UMaterialInstanceDynamic::Create(BaseMaterial, nullptr);
   MatInstance->SetTextureParameterValue("BaseColor", Texture);
+
   return MatInstance;
 }

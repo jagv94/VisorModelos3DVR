@@ -23,7 +23,8 @@ public class RuntimeFBXLoader : ModuleRules
     PrivateDependencyModuleNames.AddRange(
       new string[]
       {
-        "Projects" // Para acceso a directorios
+        "Projects", // Para acceso a directorios
+        "TextureUtilitiesCommon" // Para acceso a FTextureBuildSettings
       }
     );
 

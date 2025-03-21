@@ -7,8 +7,11 @@
 #include "Engine/Texture2D.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "FBXLoader.h"
+#include "Logging/LogMacros.h"
 
 #include "RuntimeFBXLoader.generated.h"
+
+DECLARE_LOG_CATEGORY_EXTERN(RuntimeFBXLoaderLog, Log, All);
 
 // Definir la macro de exportación para evitar redefiniciones
 #ifndef RUNTIMEFBXLOADER_API
@@ -21,8 +24,8 @@
 class RUNTIMEFBXLOADER_API FRuntimeFBXLoaderModule : public IModuleInterface
 {
 public:
-  virtual void StartupModule() override;
-  virtual void ShutdownModule() override;
+  virtual void StartupModule();
+  virtual void ShutdownModule();
 };
 
 /**
