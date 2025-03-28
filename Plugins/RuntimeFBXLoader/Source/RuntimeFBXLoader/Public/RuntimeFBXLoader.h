@@ -9,8 +9,15 @@
 #include "PhysicsEngine/BodySetup.h"
 #include "StaticMeshResources.h"
 #include "RenderResource.h"
+#include "MeshDescription.h"
+#include "StaticMeshAttributes.h"
+#include "StaticMeshDescription.h"
 
 #include "RuntimeFBXLoader.generated.h"
+
+struct aiScene;
+struct aiMesh;
+struct aiMaterial;
 
 DECLARE_LOG_CATEGORY_EXTERN(RuntimeFBXLoaderLog, Log, All);
 
@@ -40,6 +47,20 @@ public:
   UMaterialInstanceDynamic* CreateMaterial(UTexture2D* Texture);
 
 private:
-  UStaticMesh* CreateStaticMeshFromAssimp(aiMesh* Mesh, const aiScene* Scene);
   void ProcessMaterials(const aiScene* Scene, UStaticMesh* StaticMesh);
+};
+
+USTRUCT(BlueprintType)
+struct FImportedMeshData
+{
+  GENERATED_BODY()
+
+  UPROPERTY(BlueprintReadOnly)
+  UStaticMesh* StaticMesh;
+
+  UPROPERTY(BlueprintReadOnly)
+  FTransform RelativeTransform;
+
+  UPROPERTY(BlueprintReadOnly)
+  FString MeshName;
 };

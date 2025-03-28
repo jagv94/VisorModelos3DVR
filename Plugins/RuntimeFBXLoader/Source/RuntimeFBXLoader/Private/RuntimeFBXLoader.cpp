@@ -15,32 +15,18 @@
 #include "StaticMeshDescription.h"
 #include "PhysicsEngine/BodySetup.h"
 #include "Misc/App.h"
+#include "Async/Async.h"
 
 DEFINE_LOG_CATEGORY(RuntimeFBXLoaderLog);
 
 void FRuntimeFBXLoaderModule::StartupModule()
 {
-  UE_LOG(RuntimeFBXLoaderLog, Warning, TEXT("RuntimeFBXLoader module starting..."));
-
-  // Cargar DLL de Assimp
-  FString AssimpDLLPath = FPaths::Combine(
-    FPaths::ProjectPluginsDir(),
-    TEXT("RuntimeFBXLoader/ThirdParty/assimp/bin/x64/assimp-vc143-mt.dll")
-  );
-
-  if (FPaths::FileExists(AssimpDLLPath))
-  {
-    void* AssimpDLLHandle = FPlatformProcess::GetDllHandle(*AssimpDLLPath);
-    if (!AssimpDLLHandle)
-    {
-      UE_LOG(RuntimeFBXLoaderLog, Error, TEXT("Failed to load Assimp DLL!"));
-    }
-  }
+  UE_LOG(RuntimeFBXLoaderLog, Log, TEXT("RuntimeFBXLoader module started"));
 }
 
 void FRuntimeFBXLoaderModule::ShutdownModule()
 {
-  UE_LOG(RuntimeFBXLoaderLog, Warning, TEXT("RuntimeFBXLoader module shutting down..."));
+  UE_LOG(RuntimeFBXLoaderLog, Log, TEXT("RuntimeFBXLoader module shutdown"));
 }
 
 IMPLEMENT_MODULE(FRuntimeFBXLoaderModule, RuntimeFBXLoader)
@@ -55,95 +41,96 @@ UStaticMesh* UFBXLoader::LoadFBX(const FString& FilePath)
   const aiScene* Scene = FBXLoader::LoadFBX(FilePath);
   if (!Scene || !Scene->HasMeshes())
   {
+    UE_LOG(RuntimeFBXLoaderLog, Error, TEXT("Failed to load FBX file or no meshes found"));
     return nullptr;
   }
 
-  UStaticMesh* StaticMesh = CreateStaticMeshFromAssimp(Scene->mMeshes[0], Scene);
-  ProcessMaterials(Scene, StaticMesh);
-
-  return StaticMesh;
-}
-
-UStaticMesh* UFBXLoader::CreateStaticMeshFromAssimp(aiMesh* Mesh, const aiScene* Scene)
-{
-  if (!Mesh) return nullptr;
-
-  // Crear objeto StaticMesh
+  // Create combined static mesh
   FName MeshName = MakeUniqueObjectName(GetTransientPackage(), UStaticMesh::StaticClass(), TEXT("RuntimeMesh"));
   UStaticMesh* StaticMesh = NewObject<UStaticMesh>(GetTransientPackage(), MeshName, RF_Transient | RF_Public);
-
-  // Configurar LOD
   StaticMesh->SetNumSourceModels(1);
   FStaticMeshSourceModel& SourceModel = StaticMesh->GetSourceModel(0);
 
-  // Crear y configurar MeshDescription directamente
   FMeshDescription* MeshDescription = StaticMesh->CreateMeshDescription(0);
-  if (!MeshDescription)
-  {
-    UE_LOG(RuntimeFBXLoaderLog, Error, TEXT("Failed to create MeshDescription"));
-    return nullptr;
-  }
-
   FStaticMeshAttributes Attributes(*MeshDescription);
   Attributes.Register();
 
-  // Añadir vértices
-  TArray<FVertexID> VertexIDs;
-  VertexIDs.Reserve(Mesh->mNumVertices);
-  for (uint32 i = 0; i < Mesh->mNumVertices; i++)
-  {
-    FVertexID VertexID = MeshDescription->CreateVertex();
-    VertexIDs.Add(VertexID);
-    Attributes.GetVertexPositions()[VertexID] = FVector3f(Mesh->mVertices[i].x, Mesh->mVertices[i].y, Mesh->mVertices[i].z);
-  }
+  TArray<FStaticMaterial> StaticMaterials;
+  TArray<FPolygonGroupID> PolygonGroups;
 
-  // Añadir polígonos
-  FPolygonGroupID PolygonGroupID = MeshDescription->CreatePolygonGroup();
-
-  for (uint32 i = 0; i < Mesh->mNumFaces; i++)
+  // Process all meshes
+  for (uint32 MeshIndex = 0; MeshIndex < Scene->mNumMeshes; MeshIndex++)
   {
-    const aiFace& Face = Mesh->mFaces[i];
-    if (Face.mNumIndices == 3)
+    const aiMesh* Mesh = Scene->mMeshes[MeshIndex];
+    if (!Mesh) continue;
+
+    // Add vertices
+    TArray<FVertexID> VertexIDs;
+    VertexIDs.Reserve(Mesh->mNumVertices);
+    for (uint32 i = 0; i < Mesh->mNumVertices; i++)
     {
-      TArray<FVertexInstanceID> VertexInstanceIDs;
-      for (int j = 0; j < 3; j++)
+      FVertexID VertexID = MeshDescription->CreateVertex();
+      VertexIDs.Add(VertexID);
+      Attributes.GetVertexPositions()[VertexID] =
+        FVector3f(Mesh->mVertices[i].x, Mesh->mVertices[i].y, Mesh->mVertices[i].z);
+    }
+
+    // Create polygon group for this mesh
+    FPolygonGroupID PolygonGroupID = MeshDescription->CreatePolygonGroup();
+    PolygonGroups.Add(PolygonGroupID);
+
+    // Add faces
+    for (uint32 i = 0; i < Mesh->mNumFaces; i++)
+    {
+      const aiFace& Face = Mesh->mFaces[i];
+      if (Face.mNumIndices == 3)
       {
-        FVertexInstanceID InstanceID = MeshDescription->CreateVertexInstance(VertexIDs[Face.mIndices[j]]);
-        VertexInstanceIDs.Add(InstanceID);
-
-        // Configurar normales si existen
-        if (Mesh->HasNormals())
+        TArray<FVertexInstanceID> VertexInstanceIDs;
+        for (int j = 0; j < 3; j++)
         {
-          Attributes.GetVertexInstanceNormals()[InstanceID] =
-            FVector3f(Mesh->mNormals[Face.mIndices[j]].x,
-              Mesh->mNormals[Face.mIndices[j]].y,
-              Mesh->mNormals[Face.mIndices[j]].z);
-        }
+          FVertexInstanceID InstanceID = MeshDescription->CreateVertexInstance(VertexIDs[Face.mIndices[j]]);
+          VertexInstanceIDs.Add(InstanceID);
 
-        // Configurar UVs si existen
-        if (Mesh->HasTextureCoords(0))
-        {
-          Attributes.GetVertexInstanceUVs().Set(InstanceID, 0,
-            FVector2f(
-              static_cast<float>(Mesh->mTextureCoords[0][Face.mIndices[j]].x),
-              static_cast<float>(Mesh->mTextureCoords[0][Face.mIndices[j]].y)
-            ));
+          if (Mesh->HasNormals())
+          {
+            Attributes.GetVertexInstanceNormals()[InstanceID] =
+              FVector3f(Mesh->mNormals[Face.mIndices[j]].x,
+                Mesh->mNormals[Face.mIndices[j]].y,
+                Mesh->mNormals[Face.mIndices[j]].z);
+          }
+
+          if (Mesh->HasTextureCoords(0))
+          {
+            Attributes.GetVertexInstanceUVs().Set(InstanceID, 0,
+              FVector2f(Mesh->mTextureCoords[0][Face.mIndices[j]].x,
+                1.0f - Mesh->mTextureCoords[0][Face.mIndices[j]].y)); // Flip V coordinate
+          }
+
+          if (Mesh->HasTangentsAndBitangents())
+          {
+            Attributes.GetVertexInstanceTangents()[InstanceID] =
+              FVector3f(Mesh->mTangents[Face.mIndices[j]].x,
+                Mesh->mTangents[Face.mIndices[j]].y,
+                Mesh->mTangents[Face.mIndices[j]].z);
+          }
         }
+        MeshDescription->CreatePolygon(PolygonGroupID, VertexInstanceIDs);
       }
-      MeshDescription->CreatePolygon(PolygonGroupID, VertexInstanceIDs);
     }
   }
 
-  // Confirmar cambios en el MeshDescription
   StaticMesh->CommitMeshDescription(0);
 
-  // Configurar opciones de construcción
-  SourceModel.BuildSettings.bRecomputeNormals = !Mesh->HasNormals();
-  SourceModel.BuildSettings.bRecomputeTangents = true;
+  // Configure build settings
+  SourceModel.BuildSettings.bRecomputeNormals = false;
+  SourceModel.BuildSettings.bRecomputeTangents = false;
   SourceModel.BuildSettings.bGenerateLightmapUVs = true;
   SourceModel.BuildSettings.bBuildReversedIndexBuffer = false;
 
-  // Construir la malla estática
+  // Process materials
+  ProcessMaterials(Scene, StaticMesh);
+
+  // Build mesh
   StaticMesh->Build(false);
   StaticMesh->CreateBodySetup();
   StaticMesh->GetBodySetup()->CollisionTraceFlag = ECollisionTraceFlag::CTF_UseDefault;
@@ -156,28 +143,96 @@ void UFBXLoader::ProcessMaterials(const aiScene* Scene, UStaticMesh* StaticMesh)
 {
   if (!Scene || !StaticMesh) return;
 
-  // Añadir materiales básicos
+  StaticMesh->GetStaticMaterials().Empty();
+
   for (uint32 i = 0; i < Scene->mNumMaterials; i++)
   {
-    StaticMesh->GetStaticMaterials().Add(FStaticMaterial());
+    const aiMaterial* Material = Scene->mMaterials[i];
+    UMaterialInstanceDynamic* DynamicMaterial = nullptr;
+
+    // Try to load diffuse texture
+    aiString TexturePath;
+    if (Material->GetTexture(aiTextureType_DIFFUSE, 0, &TexturePath) == AI_SUCCESS)
+    {
+      FString TextureFilePath = FPaths::GetCleanFilename(UTF8_TO_TCHAR(TexturePath.C_Str()));
+      FString BasePath = FPaths::GetPath(TextureFilePath);
+
+      // Search in common texture paths
+      TArray<FString> TextureSearchPaths = {
+          FPaths::ProjectContentDir() + "Textures/",
+          FPaths::ProjectContentDir() + BasePath + "/",
+          FPaths::ProjectContentDir()
+      };
+
+      UTexture2D* Texture = nullptr;
+      for (const FString& SearchPath : TextureSearchPaths)
+      {
+        FString FullPath = SearchPath + TextureFilePath;
+        Texture = LoadTextureFromPath(FullPath);
+        if (Texture) break;
+      }
+
+      DynamicMaterial = CreateMaterial(Texture);
+    }
+
+    if (!DynamicMaterial)
+    {
+      // Default material if no texture found
+      UMaterial* BaseMaterial = LoadObject<UMaterial>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial"));
+      if (BaseMaterial)
+      {
+        DynamicMaterial = UMaterialInstanceDynamic::Create(BaseMaterial, nullptr);
+        DynamicMaterial->SetVectorParameterValue("BaseColor", FLinearColor::Gray);
+      }
+    }
+
+    if (DynamicMaterial)
+    {
+      FStaticMaterial StaticMaterial(DynamicMaterial);
+      StaticMesh->GetStaticMaterials().Add(StaticMaterial);
+    }
   }
 }
 
 UTexture2D* UFBXLoader::LoadTextureFromPath(const FString& Path)
 {
   if (Path.IsEmpty()) return nullptr;
-  return Cast<UTexture2D>(StaticLoadObject(UTexture2D::StaticClass(), nullptr, *Path));
+
+  UTexture2D* Texture = Cast<UTexture2D>(StaticLoadObject(UTexture2D::StaticClass(), nullptr, *Path));
+  if (!Texture)
+  {
+    // Try loading with different extensions
+    FString BaseFilename = FPaths::GetBaseFilename(Path);
+    TArray<FString> Extensions = { ".png", ".jpg", ".jpeg", ".tga", ".bmp" };
+
+    for (const FString& Ext : Extensions)
+    {
+      Texture = Cast<UTexture2D>(StaticLoadObject(UTexture2D::StaticClass(), nullptr, *(BaseFilename + Ext)));
+      if (Texture) break;
+    }
+  }
+
+  return Texture;
 }
 
 UMaterialInstanceDynamic* UFBXLoader::CreateMaterial(UTexture2D* Texture)
 {
-  if (!Texture) return nullptr;
-
   UMaterial* BaseMaterial = LoadObject<UMaterial>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial"));
-  if (!BaseMaterial) return nullptr;
+  if (!BaseMaterial)
+  {
+    UE_LOG(RuntimeFBXLoaderLog, Error, TEXT("Failed to load base material"));
+    return nullptr;
+  }
 
   UMaterialInstanceDynamic* DynamicMaterial = UMaterialInstanceDynamic::Create(BaseMaterial, nullptr);
-  DynamicMaterial->SetTextureParameterValue("BaseColor", Texture);
+  if (Texture)
+  {
+    DynamicMaterial->SetTextureParameterValue("BaseColor", Texture);
+  }
+  else
+  {
+    DynamicMaterial->SetVectorParameterValue("BaseColor", FLinearColor::White);
+  }
 
   return DynamicMaterial;
 }
