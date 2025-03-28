@@ -1,7 +1,6 @@
 #include "RuntimeFBXLoader.h"
 #include "FBXLoader.h"
 #include "Engine/StaticMesh.h"
-#include "Rendering/NaniteResources.h"
 #include "Modules/ModuleManager.h"
 #include "Engine/Texture.h"
 #include "Engine/Texture2D.h"
@@ -9,6 +8,13 @@
 #include "TextureResource.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "UObject/ConstructorHelpers.h"
+#include "AssetRegistry/AssetRegistryModule.h"
+#include "Materials/Material.h"
+#include "StaticMeshAttributes.h"
+#include "StaticMeshOperations.h"
+#include "StaticMeshDescription.h"
+#include "PhysicsEngine/BodySetup.h"
+#include "Misc/App.h"
 
 DEFINE_LOG_CATEGORY(RuntimeFBXLoaderLog);
 
@@ -16,30 +22,20 @@ void FRuntimeFBXLoaderModule::StartupModule()
 {
   UE_LOG(RuntimeFBXLoaderLog, Warning, TEXT("RuntimeFBXLoader module starting..."));
 
-  // Ruta al directorio del plugin
+  // Cargar DLL de Assimp
   FString AssimpDLLPath = FPaths::Combine(
     FPaths::ProjectPluginsDir(),
     TEXT("RuntimeFBXLoader/ThirdParty/assimp/bin/x64/assimp-vc143-mt.dll")
   );
 
-  if (!FPaths::FileExists(AssimpDLLPath))
-  {
-    UE_LOG(RuntimeFBXLoaderLog, Error, TEXT("Assimp DLL not found at %s"), *AssimpDLLPath);
-  }
-  else
+  if (FPaths::FileExists(AssimpDLLPath))
   {
     void* AssimpDLLHandle = FPlatformProcess::GetDllHandle(*AssimpDLLPath);
     if (!AssimpDLLHandle)
     {
       UE_LOG(RuntimeFBXLoaderLog, Error, TEXT("Failed to load Assimp DLL!"));
     }
-    else
-    {
-      UE_LOG(RuntimeFBXLoaderLog, Warning, TEXT("Assimp DLL loaded successfully."));
-    }
   }
-
-  UE_LOG(RuntimeFBXLoaderLog, Warning, TEXT("RuntimeFBXLoader module initialized successfully."));
 }
 
 void FRuntimeFBXLoaderModule::ShutdownModule()
@@ -62,107 +58,126 @@ UStaticMesh* UFBXLoader::LoadFBX(const FString& FilePath)
     return nullptr;
   }
 
-  return CreateStaticMeshFromAssimp(Scene->mMeshes[0]);
+  UStaticMesh* StaticMesh = CreateStaticMeshFromAssimp(Scene->mMeshes[0], Scene);
+  ProcessMaterials(Scene, StaticMesh);
+
+  return StaticMesh;
 }
 
-UStaticMesh* UFBXLoader::CreateStaticMeshFromAssimp(aiMesh* Mesh)
+UStaticMesh* UFBXLoader::CreateStaticMeshFromAssimp(aiMesh* Mesh, const aiScene* Scene)
 {
-  if (!Mesh)
+  if (!Mesh) return nullptr;
+
+  // Crear objeto StaticMesh
+  FName MeshName = MakeUniqueObjectName(GetTransientPackage(), UStaticMesh::StaticClass(), TEXT("RuntimeMesh"));
+  UStaticMesh* StaticMesh = NewObject<UStaticMesh>(GetTransientPackage(), MeshName, RF_Transient | RF_Public);
+
+  // Configurar LOD
+  StaticMesh->SetNumSourceModels(1);
+  FStaticMeshSourceModel& SourceModel = StaticMesh->GetSourceModel(0);
+
+  // Crear y configurar MeshDescription directamente
+  FMeshDescription* MeshDescription = StaticMesh->CreateMeshDescription(0);
+  if (!MeshDescription)
   {
-    UE_LOG(RuntimeFBXLoaderLog, Warning, TEXT("Mesh inválida."));
+    UE_LOG(RuntimeFBXLoaderLog, Error, TEXT("Failed to create MeshDescription"));
     return nullptr;
   }
 
-  UE_LOG(RuntimeFBXLoaderLog, Warning, TEXT("Vertices: %d, Faces: %d"), Mesh->mNumVertices, Mesh->mNumFaces);
+  FStaticMeshAttributes Attributes(*MeshDescription);
+  Attributes.Register();
 
-  UStaticMesh* NewMesh = NewObject<UStaticMesh>();
-  if (!NewMesh)
-  {
-    UE_LOG(RuntimeFBXLoaderLog, Error, TEXT("No se pudo crear el StaticMesh."));
-    return nullptr;
-  }
-
-  // Crear RenderData usando MakeUnique para usar TUniquePtr
-  NewMesh->SetRenderData(MakeUnique<FStaticMeshRenderData>());
-  FStaticMeshRenderData* RenderData = NewMesh->GetRenderData();
-
-  // Crear nuevo recurso LOD
-  FStaticMeshLODResources* LOD = new FStaticMeshLODResources();
-  RenderData->LODResources.Add(LOD);
-
-  // Inicializar el buffer de posición de vértices
-  LOD->VertexBuffers.PositionVertexBuffer.Init(Mesh->mNumVertices, false);
-  FVector3f* VertexData = reinterpret_cast<FVector3f*>(LOD->VertexBuffers.PositionVertexBuffer.GetVertexData());
-
+  // Añadir vértices
+  TArray<FVertexID> VertexIDs;
+  VertexIDs.Reserve(Mesh->mNumVertices);
   for (uint32 i = 0; i < Mesh->mNumVertices; i++)
   {
-    VertexData[i] = FVector3f(Mesh->mVertices[i].x, Mesh->mVertices[i].y, Mesh->mVertices[i].z);
+    FVertexID VertexID = MeshDescription->CreateVertex();
+    VertexIDs.Add(VertexID);
+    Attributes.GetVertexPositions()[VertexID] = FVector3f(Mesh->mVertices[i].x, Mesh->mVertices[i].y, Mesh->mVertices[i].z);
   }
 
-  // Inicializar el buffer de índices
-  TArray<uint32> Indices;
-  for (unsigned int i = 0; i < Mesh->mNumFaces; i++)
+  // Añadir polígonos
+  FPolygonGroupID PolygonGroupID = MeshDescription->CreatePolygonGroup();
+
+  for (uint32 i = 0; i < Mesh->mNumFaces; i++)
   {
-    aiFace& Face = Mesh->mFaces[i];
-    if (Face.mNumIndices == 3) // Solo triángulos
+    const aiFace& Face = Mesh->mFaces[i];
+    if (Face.mNumIndices == 3)
     {
-      Indices.Add(Face.mIndices[0]);
-      Indices.Add(Face.mIndices[1]);
-      Indices.Add(Face.mIndices[2]);
+      TArray<FVertexInstanceID> VertexInstanceIDs;
+      for (int j = 0; j < 3; j++)
+      {
+        FVertexInstanceID InstanceID = MeshDescription->CreateVertexInstance(VertexIDs[Face.mIndices[j]]);
+        VertexInstanceIDs.Add(InstanceID);
+
+        // Configurar normales si existen
+        if (Mesh->HasNormals())
+        {
+          Attributes.GetVertexInstanceNormals()[InstanceID] =
+            FVector3f(Mesh->mNormals[Face.mIndices[j]].x,
+              Mesh->mNormals[Face.mIndices[j]].y,
+              Mesh->mNormals[Face.mIndices[j]].z);
+        }
+
+        // Configurar UVs si existen
+        if (Mesh->HasTextureCoords(0))
+        {
+          Attributes.GetVertexInstanceUVs().Set(InstanceID, 0,
+            FVector2f(
+              static_cast<float>(Mesh->mTextureCoords[0][Face.mIndices[j]].x),
+              static_cast<float>(Mesh->mTextureCoords[0][Face.mIndices[j]].y)
+            ));
+        }
+      }
+      MeshDescription->CreatePolygon(PolygonGroupID, VertexInstanceIDs);
     }
   }
 
-  LOD->IndexBuffer.SetIndices(Indices, EIndexBufferStride::AutoDetect);
+  // Confirmar cambios en el MeshDescription
+  StaticMesh->CommitMeshDescription(0);
 
-  // Activar Nanite (si es necesario)
-  NewMesh->NaniteSettings.bEnabled = true;
+  // Configurar opciones de construcción
+  SourceModel.BuildSettings.bRecomputeNormals = !Mesh->HasNormals();
+  SourceModel.BuildSettings.bRecomputeTangents = true;
+  SourceModel.BuildSettings.bGenerateLightmapUVs = true;
+  SourceModel.BuildSettings.bBuildReversedIndexBuffer = false;
 
-  // Inicializar los recursos
-  LOD->VertexBuffers.PositionVertexBuffer.InitResource();
-  LOD->IndexBuffer.InitResource();
+  // Construir la malla estática
+  StaticMesh->Build(false);
+  StaticMesh->CreateBodySetup();
+  StaticMesh->GetBodySetup()->CollisionTraceFlag = ECollisionTraceFlag::CTF_UseDefault;
+  StaticMesh->PostEditChange();
 
-  // Crear el body setup y marcar como modificado
-  NewMesh->CreateBodySetup();
-  NewMesh->MarkPackageDirty();
+  return StaticMesh;
+}
 
-  return NewMesh;
+void UFBXLoader::ProcessMaterials(const aiScene* Scene, UStaticMesh* StaticMesh)
+{
+  if (!Scene || !StaticMesh) return;
+
+  // Añadir materiales básicos
+  for (uint32 i = 0; i < Scene->mNumMaterials; i++)
+  {
+    StaticMesh->GetStaticMaterials().Add(FStaticMaterial());
+  }
 }
 
 UTexture2D* UFBXLoader::LoadTextureFromPath(const FString& Path)
 {
-  if (Path.IsEmpty())
-  {
-    UE_LOG(RuntimeFBXLoaderLog, Warning, TEXT("LoadTextureFromPath: Path is empty"));
-    return nullptr;
-  }
-
-  UTexture2D* Texture = Cast<UTexture2D>(StaticLoadObject(UTexture2D::StaticClass(), nullptr, *Path));
-  if (!Texture)
-  {
-    UE_LOG(RuntimeFBXLoaderLog, Warning, TEXT("Failed to load texture from path: %s"), *Path);
-    return nullptr;
-  }
-
-  return Texture;
+  if (Path.IsEmpty()) return nullptr;
+  return Cast<UTexture2D>(StaticLoadObject(UTexture2D::StaticClass(), nullptr, *Path));
 }
 
 UMaterialInstanceDynamic* UFBXLoader::CreateMaterial(UTexture2D* Texture)
 {
-  if (!Texture)
-  {
-    UE_LOG(RuntimeFBXLoaderLog, Warning, TEXT("CreateMaterial: Texture is null"));
-    return nullptr;
-  }
+  if (!Texture) return nullptr;
 
-  UMaterialInterface* BaseMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Materials/BaseMaterial"));
-  if (!BaseMaterial)
-  {
-    UE_LOG(RuntimeFBXLoaderLog, Error, TEXT("CreateMaterial: BaseMaterial not found"));
-    return nullptr;
-  }
+  UMaterial* BaseMaterial = LoadObject<UMaterial>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial"));
+  if (!BaseMaterial) return nullptr;
 
-  UMaterialInstanceDynamic* MatInstance = UMaterialInstanceDynamic::Create(BaseMaterial, nullptr);
-  MatInstance->SetTextureParameterValue("BaseColor", Texture);
+  UMaterialInstanceDynamic* DynamicMaterial = UMaterialInstanceDynamic::Create(BaseMaterial, nullptr);
+  DynamicMaterial->SetTextureParameterValue("BaseColor", Texture);
 
-  return MatInstance;
+  return DynamicMaterial;
 }
