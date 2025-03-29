@@ -18,7 +18,13 @@ public class RuntimeFBXLoader : ModuleRules
                 "RenderCore",
                 "ProceduralMeshComponent",
                 "UMG",
-                "DesktopPlatform"
+                "DesktopPlatform",
+                "HeadMountedDisplay",  // Para XR/MotionController
+                "XRBase",              // Módulo adicional para UE5.4+
+                "InputCore",           // Para interacción VR
+                "EnhancedInput",       // Opcional: Para input moderno
+                "HeadMountedDisplay",  // Necesario para MotionController
+                "XRBase"               // Necesario para UE5.4+
         });
 
     PrivateDependencyModuleNames.AddRange(
@@ -26,7 +32,8 @@ public class RuntimeFBXLoader : ModuleRules
         {
                 "Projects",
                 "Slate",
-                "SlateCore"
+                "SlateCore",
+                "TextureBuildUtilities" // Para evitar errores con FTextureBuildSettings
         });
 
     LoadAssimp(Target);

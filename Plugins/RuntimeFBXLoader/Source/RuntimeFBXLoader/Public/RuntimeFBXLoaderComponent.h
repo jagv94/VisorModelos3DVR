@@ -2,9 +2,25 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "ProceduralMeshComponent.h"
+#include "HAL/FileManager.h"
+#include "Misc/Paths.h"
 #include "RuntimeFBXLoaderComponent.generated.h"
 
-class UProceduralMeshComponent;
+USTRUCT(BlueprintType)
+struct FFBXFileInfo
+{
+  GENERATED_BODY()
+
+  UPROPERTY(BlueprintReadOnly, Category = "FBX Info")
+  FString FileName;
+
+  UPROPERTY(BlueprintReadOnly, Category = "FBX Info")
+  int64 FileSize;
+
+  UPROPERTY(BlueprintReadOnly, Category = "FBX Info")
+  FDateTime LastModified;
+};
 
 UCLASS(ClassGroup = (Custom), meta = (BlueprintSpawnableComponent))
 class RUNTIMEFBXLOADER_API URuntimeFBXLoaderComponent : public UActorComponent
@@ -14,16 +30,33 @@ class RUNTIMEFBXLOADER_API URuntimeFBXLoaderComponent : public UActorComponent
 public:
   URuntimeFBXLoaderComponent();
 
-  UFUNCTION(BlueprintCallable, Category = "Runtime FBX Loader")
+protected:
+  virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
+
+  // Sistema de archivos
+  UFUNCTION(BlueprintCallable, Category = "FBX Loader|File System")
   bool LoadFBXFile(const FString& FilePath);
 
-  UFUNCTION(BlueprintCallable, Category = "Runtime FBX Loader")
+  UFUNCTION(BlueprintCallable, Category = "FBX Loader|File System")
   bool OpenAndLoadFBXFile();
 
-  UFUNCTION(BlueprintCallable, Category = "Runtime FBX Loader", meta = (HidePin = "Owner", DefaultToSelf = "Owner"))
-  static URuntimeFBXLoaderComponent* CreateFBXLoaderComponent(AActor* Owner);
+  UFUNCTION(BlueprintCallable, Category = "FBX Loader|File System")
+  bool SetActiveDirectory(const FString& DirectoryPath);
 
-protected:
-  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Runtime FBX Loader")
+  UFUNCTION(BlueprintCallable, Category = "FBX Loader|File System")
+  TArray<FFBXFileInfo> GetFilesInActiveDirectory() const;
+
+  UFUNCTION(BlueprintCallable, Category = "FBX Loader|File System")
+  bool OpenDirectoryDialog();
+
+  // Manipulación del modelo
+  UFUNCTION(BlueprintCallable, Category = "FBX Loader|Manipulation")
+  void SetModelTransform(const FTransform& NewTransform);
+
+  UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "FBX Loader")
+  FString ActiveDirectory;
+
+  UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "FBX Loader")
   UProceduralMeshComponent* TargetMeshComponent;
+  FString LastLoadedFile;
 };

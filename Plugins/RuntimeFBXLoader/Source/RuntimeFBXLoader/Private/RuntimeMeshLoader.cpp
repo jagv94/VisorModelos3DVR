@@ -83,4 +83,7 @@ void FRuntimeMeshLoader::ProcessMesh(const aiMesh* Mesh, const aiScene* Scene, U
 
   // Crear la malla
   MeshComponent->CreateMeshSection_LinearColor(0, Vertices, Triangles, Normals, UV0, TArray<FLinearColor>(), Tangents, true);
+
+  // Configurar colisiones
+  MeshComponent->ContainsPhysicsTriMeshData(true);
 }
