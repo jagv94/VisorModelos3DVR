@@ -1,0 +1,13 @@
+{
+    "Version": "1.2",
+    "Data": {
+        "Source": "e:\\_trabajo\\unreal projects\\visormodelos3dvr\\plugins\\marketplace\\importex232bbcddcf49v4\\intermediate\\build\\win64\\unrealeditor\\inc\\importexportmodels\\uht\\importexportmodels.init.gen.cpp",
+        "ProvidedModule": "",
+        "PCH": "e:\\_trabajo\\unreal projects\\visormodelos3dvr\\intermediate\\build\\win64\\x64\\visormodelos3dvreditor\\development\\unrealed\\sharedpch.unrealed.project.valapi.cpp20.inclorderoldest.h.pch",
+        "Includes": [
+            "e:\\_trabajo\\unreal projects\\visormodelos3dvr\\plugins\\marketplace\\importex232bbcddcf49v4\\intermediate\\build\\win64\\x64\\unrealeditor\\development\\importexportmodels\\definitions.importexportmodels.h"
+        ],
+        "ImportedModules": [],
+        "ImportedHeaderUnits": []
+    }
+}

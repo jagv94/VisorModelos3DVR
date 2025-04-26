@@ -1,0 +1,24 @@
+{
+  "FileVersion": 3,
+  "Version": 1,
+  "VersionName": "1.0",
+  "FriendlyName": "RuntimeMeshToNanite",
+  "Description": "Este plugin convierte modelos importados en tiempo de ejecución (FModeldMaterialData) en Static Meshes completamente compatibles con Nanite. Pensado para optimizar la visualización de modelos dinámicos, proporcionando compatibilidad total con la tecnología Nanite de Unreal Engine 5, sin modificar el flujo de importación original.",
+  "Category": "Runtime",
+  "CreatedBy": "Jose Adrián Guerra Viudez",
+  "CreatedByURL": "https://jagv94.github.io/index.html",
+  "DocsURL": "",
+  "MarketplaceURL": "",
+  "SupportURL": "",
+  "CanContainContent": false,
+  "IsBetaVersion": false,
+  "IsExperimentalVersion": false,
+  "Installed": false,
+  "Modules": [
+    {
+      "Name": "RuntimeMeshToNanite",
+      "Type": "Runtime",
+      "LoadingPhase": "Default"
+    }
+  ]
+}
