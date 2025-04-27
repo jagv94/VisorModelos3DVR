@@ -2,12 +2,12 @@
 	"RemapUnityFiles": 
 	{
 		"Module.ImportExportModels.cpp.obj": [
-			"ImportExportModels.cpp.obj",
-			"ImportExportModelsBPLibrary.cpp.obj",
-			"LoadModelActor.cpp.obj",
 			"ImportExportModels.init.gen.cpp.obj",
 			"ImportExportModelsBPLibrary.gen.cpp.obj",
-			"LoadModelActor.gen.cpp.obj"
+			"LoadModelActor.gen.cpp.obj",
+			"ImportExportModels.cpp.obj",
+			"ImportExportModelsBPLibrary.cpp.obj",
+			"LoadModelActor.cpp.obj"
 		]
 	}
 }

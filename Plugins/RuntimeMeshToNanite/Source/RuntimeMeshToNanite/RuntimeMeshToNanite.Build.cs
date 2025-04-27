@@ -9,29 +9,46 @@ public class RuntimeMeshToNanite : ModuleRules
     PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
     bUseUnity = false;
 
+    // Necesario para la generación de código
+    PublicIncludePaths.AddRange(
+        new string[] {
+                ModuleDirectory + "/Public"
+        }
+    );
+
     PublicDependencyModuleNames.AddRange(new string[] {
-            "Core",
-            "CoreUObject",
-            "Engine",
-            "MeshDescription",
-            "StaticMeshDescription",
-            "RenderCore",
-            "RHI",
-            "AssetRegistry",
-            "ImportExportModels" // Añade el módulo del plugin que estás extendiendo
-        });
+      "Core",
+      "CoreUObject",
+      "Engine",
+      "MeshDescription",
+      "StaticMeshDescription",
+      "RenderCore",
+      "RHI",
+      "AssetRegistry",
+      "ImportExportModels"
+    });
 
     PrivateDependencyModuleNames.AddRange(new string[] {
-            "UnrealEd", // Necesario para algunas operaciones de assets
-            "NaniteBuilder" // Para soporte Nanite
-        });
+      "UnrealEd",
+      "NaniteBuilder",
+      "Slate",
+      "SlateCore",
+      "Projects",
+      "UMG"
+    });
 
     if (Target.bBuildEditor)
     {
       PrivateDependencyModuleNames.AddRange(new string[] {
-                "MeshUtilities",
-                "MaterialUtilities"
-            });
+        "MeshUtilities",
+        "MaterialUtilities",
+        "MaterialBaking",
+        "UnrealEd"
+      });
     }
+
+    // Configuración adicional para generación de código
+    bEnableUndefinedIdentifierWarnings = false;
+    ShadowVariableWarningLevel = WarningLevel.Off;
   }
 }
