@@ -12,6 +12,21 @@
 	],
 	"Plugins": [
 		{
+			"Name": "ModelingToolsEditorMode",
+			"Enabled": true,
+			"TargetAllowList": [
+				"Editor"
+			]
+		},
+		{
+			"Name": "VisualStudioTools",
+			"Enabled": true,
+			"MarketplaceURL": "com.epicgames.launcher://ue/marketplace/product/362651520df94e4fa65492dbcba44ae2",
+			"SupportedTargetPlatforms": [
+				"Win64"
+			]
+		},
+		{
 			"Name": "OpenXR",
 			"Enabled": true,
 			"SupportedTargetPlatforms": [
@@ -41,23 +56,8 @@
 			]
 		},
 		{
-			"Name": "ImportExportModels",
-			"Enabled": true,
-			"MarketplaceURL": "com.epicgames.launcher://ue/marketplace/product/89ecd66fec9643d1826e7a2c6f674227"
+			"Name": "RuntimeMeshToNanite",
+			"Enabled": false
 		}
-	],
-	"TargetPlatforms": [
-		"Android",
-		"IOS",
-		"Linux",
-		"Mac",
-		"PS4",
-		"PS5",
-		"Windows",
-		"WindowsNoEditor",
-		"Switch",
-		"XboxOne",
-		"XSX",
-		"HoloLens"
 	]
 }
