@@ -27,11 +27,6 @@
 			]
 		},
 		{
-			"Name": "ImportExportModels",
-			"Enabled": true,
-			"MarketplaceURL": "com.epicgames.launcher://ue/marketplace/product/89ecd66fec9643d1826e7a2c6f674227"
-		},
-		{
 			"Name": "OpenXR",
 			"Enabled": true,
 			"SupportedTargetPlatforms": [
@@ -59,6 +54,10 @@
 				"Android",
 				"VisionOS"
 			]
+		},
+		{
+			"Name": "RuntimeMeshToNanite",
+			"Enabled": false
 		}
 	]
 }
