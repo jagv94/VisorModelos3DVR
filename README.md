@@ -62,7 +62,6 @@ Other tools like Cesium were considered but discarded due to:
 * 🔄 **Automated Model Conversion**: Drag-and-drop style processing for non-technical users
 * ⚙️ **Nanite Integration**: Supports large, high-detail models with excellent performance
 * 📆 **PAK Packaging**: Models are bundled for easy deployment and sharing
-* 🔌 **Plugin System**: Optional plugin to import/export models or scenes
 
 ---
 
