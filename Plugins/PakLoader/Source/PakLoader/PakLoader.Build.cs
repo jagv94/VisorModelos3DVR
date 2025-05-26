@@ -29,6 +29,7 @@ public class PakLoader : ModuleRules
 				"Engine",
 				"InputCore",
 				"PakFile",
+				"AssetRegistry",
 				"Projects"
 			}
 			);
@@ -39,6 +40,8 @@ public class PakLoader : ModuleRules
 			{
 				"Slate",
 				"SlateCore",
+				"RenderCore",           // Si haces algo con materiales o instancias
+				"RHI"                   // Opcional, pero útil para trabajos en GPU
 			}
 			);
 		
